@@ -111,6 +111,11 @@ func sphereSupportFunctionRegistered(function string) bool {
 	switch function {
 	case "DAMAGE_BOOST", "ATK_UP_BOOST", "DEF_UP_BOOST", "ATK_BREAK_BOOST", "DAMAGE_CUT2", "GUARD_BREAK_BOOST", "HEAL_BOOST", "CRITICAL_BOOST":
 		return true
+	// JP permanent main-card passives ("常時発動") reuse the active-skill fixed
+	// parameter roles. Their arithmetic already exists for player skills, so
+	// only the support registration was missing.
+	case "ATK_UP_FIXED", "DEF_UP_FIXED":
+		return true
 	default:
 		return false
 	}
@@ -244,6 +249,14 @@ func sphereSupportEffect(role CombatSkillRole, level int, turn int, source int) 
 		effect.Value = combatParameterInt(role.Parameters[1]) + combatParameterInt(role.Parameters[2])*level/1000
 		effect.Rate = combatParameterInt(role.Parameters[3]) + combatParameterInt(role.Parameters[4])*level
 		effect.DamageKind = strings.ToUpper(strings.TrimSpace(role.Parameters[6]))
+	case "ATK_UP_FIXED", "DEF_UP_FIXED":
+		// Same fixed-buff segments as the active-skill path, minus the chain
+		// bonus a passive never has. Keep the int32 intermediate so the native
+		// overflow contract (see battle_fixed_parameters_test.go) is preserved.
+		first, second := fixedBuffRoleSegments(role, level)
+		effect.Parameter = strings.ToUpper(strings.TrimSpace(role.Parameters[1]))
+		effect.Value = int(first + second)
+		effect.Delta = effect.Value
 	}
 	return effect, nil
 }
